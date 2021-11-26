@@ -5,11 +5,13 @@ import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.ConnectionFactory;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.Channel;
+import org.springframework.amqp.utils.SerializationUtils;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeoutException;
 
 @Service
@@ -21,21 +23,23 @@ public class SendRmqService {
         ConnectionFactory factory = new ConnectionFactory();
         factory.setHost("localhost");
         try {
-            Connection connection = factory.newConnection();
-            Channel channel = connection.createChannel();
-            channel.queueDeclare(QUEUE_NAME, false, false, false, null);
-            channel.basicPublish("", QUEUE_NAME, null, serialize(venda));
-
+            processarFila(venda, factory);
         } catch (IOException | TimeoutException ex) {
             System.out.println(ex.getMessage());
         }
-
+    }
+    
+    private void processarFila(Venda venda, ConnectionFactory factory) throws IOException, TimeoutException {
+        Connection connection = factory.newConnection();
+        Channel channel = connection.createChannel();
+        channel.queueDeclare(QUEUE_NAME, false, false, false, null);
+        byte[] vendaBtyes = gerarBytes(venda);
+        channel.basicPublish("", QUEUE_NAME, null, vendaBtyes);
+        channel.close();
+        connection.close();
     }
 
-    public byte[] serialize(Venda venda) throws IOException {
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        ObjectOutputStream os = new ObjectOutputStream(out);
-        os.writeObject(venda);
-        return out.toByteArray();
+    private byte[] gerarBytes(Venda venda) {
+        return SerializationUtils.serialize(venda);
     }
 }
